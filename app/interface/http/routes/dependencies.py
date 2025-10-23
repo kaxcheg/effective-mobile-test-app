@@ -30,10 +30,10 @@ def get_jwt_service() -> JwtTokenService:
     """Return a cached JwtTokenService instance."""
     cfg = get_settings()
     return JwtTokenService(
-        secret=cfg.FASTAPI_DDD_TEMPLATE_JWT_SECRET,
-        algorithm=cfg.FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM,
+        secret=cfg.EFFECTIVE_MOBILE_TEST_APP_JWT_SECRET,
+        algorithm=cfg.EFFECTIVE_MOBILE_TEST_APP_JWT_ALGORITHM,
         default_expires=timedelta(
-            minutes=cfg.FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME
+            minutes=cfg.EFFECTIVE_MOBILE_TEST_APP_JWT_TOKEN_EXPIRY_TIME
         ),
         required_claims=("sub", "exp", "role"),
     )

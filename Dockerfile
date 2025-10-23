@@ -1,7 +1,7 @@
 # builder stage; uses own file system
 FROM python:3.12-slim AS builder
-# mkdir -p /fastapi_ddd_template && cd /fastapi_ddd_template (-p creates /fastapi_ddd_template if not exists)
-WORKDIR /fastapi_ddd_template
+# mkdir -p /app && cd /effective_mobile_test_app (-p creates /effective_mobile_test_app if not exists)
+WORKDIR /effective_mobile_test_app
 # copy pyproject.toml poetry.lock from host to builder ./
 COPY pyproject.toml poetry.lock ./
 RUN pip install --upgrade pip
@@ -14,7 +14,7 @@ RUN poetry install --without=dev --no-root
 
 # final stage: image build
 FROM python:3.12-slim
-WORKDIR /fastapi_ddd_template
+WORKDIR /effective_mobile_test_app
 # copy packages from builder to image
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin

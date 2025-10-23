@@ -75,7 +75,7 @@ def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.propagate = False
     cfg = get_settings()
-    logger.setLevel(logging.DEBUG if cfg.FASTAPI_DDD_TEMPLATE_DEBUG else logging.INFO)
+    logger.setLevel(logging.DEBUG if cfg.EFFECTIVE_MOBILE_TEST_APP_DEBUG else logging.INFO)
 
     # Stdout handler: INFO and below
     if not any(

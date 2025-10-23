@@ -14,7 +14,7 @@ set -euo pipefail
 DB_ADMIN_PWD_FILE="${DB_ADMIN_PWD_FILE:-/run/secrets/db_admin_secret}"
 DB_USER_PWD_FILE="${DB_USER_PWD_FILE:-/run/secrets/db_user_secret}"
 DB_PORT="${DB_PORT:-5432}"
-DB_TABLE_SCHEMA="${DB_TABLE_SCHEMA:-fastapi_ddd_template}"
+DB_TABLE_SCHEMA="${DB_TABLE_SCHEMA:-uneemi_match}"
 EXTENSIONS="${DB_EXTENSIONS:-}"  # e.g. "pgcrypto,uuid-ossp"
 
 # --- Read secrets from files if present ---
@@ -23,7 +23,11 @@ read_secret() {
   [[ -f "$f" ]] && tr -d '\r' < "$f" | sed -e 's/[[:space:]]*$//'
 }
 
-export PGPASSWORD="$(read_secret "$DB_ADMIN_PWD_FILE" || echo '')" # for psql, createdb, pg_isready
+if [[ -f "$DB_ADMIN_PWD_FILE" ]]; then
+  export PGPASSWORD="$(read_secret "$DB_ADMIN_PWD_FILE")"
+else
+  export PGPASSWORD="$DB_ADMIN_PWD"
+fi
 
 # --- Wait for server readiness ---
 echo "[bootstrap] waiting for ${DB_HOST}:${DB_PORT} ..."
@@ -38,12 +42,11 @@ if [[ "$role_exists" != "1" ]]; then
   echo "[bootstrap] creating role $DB_USER"
   if [[ -f "$DB_USER_PWD_FILE" ]]; then
     USER_PWD="$(read_secret "$DB_USER_PWD_FILE")"
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -v ON_ERROR_STOP=1 -c \
-      "CREATE ROLE \"$DB_USER\" LOGIN PASSWORD '$(printf "%s" "$USER_PWD" | sed "s/'/''/g")';"
   else
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -v ON_ERROR_STOP=1 -c \
-      "CREATE ROLE \"$DB_USER\" LOGIN;"
+    USER_PWD="$DB_USER_PWD"
   fi
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_ADMIN" -d postgres -v ON_ERROR_STOP=1 -c \
+    "CREATE ROLE \"$DB_USER\" LOGIN PASSWORD '$(printf "%s" "$USER_PWD" | sed "s/'/''/g")';"
 else
   echo "[bootstrap] role $DB_USER already exists"
   if [[ -f "$DB_USER_PWD_FILE" ]]; then

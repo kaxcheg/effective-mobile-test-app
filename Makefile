@@ -1,4 +1,4 @@
-# Makefile for fastapi_ddd_template (full, Dockerfile in repo root)
+# Makefile for effective_mobile_test_app (full, Dockerfile in repo root)
 # Usage examples:
 #   make build
 #   make up ENV_FILE=.env.dev       # docker compose with env file
@@ -17,7 +17,7 @@ SHELL := /bin/bash
 APP_DIR ?= app
 
 # Image / build settings
-IMAGE ?= fastapi_ddd_template_api
+IMAGE ?= effective_mobile_test_app_api
 TAG ?= dev
 FULL_IMAGE ?= $(IMAGE):$(TAG)
 

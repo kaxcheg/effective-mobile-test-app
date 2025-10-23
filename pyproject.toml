@@ -1,5 +1,5 @@
 [project]
-name = "fastapi-ddd-template"
+name = "effective-mobile-test-app"
 version = "0.1.0"
 description = "Example of SOLID DDD architecture with FastAPI and SQLAlchemy"
 authors = [

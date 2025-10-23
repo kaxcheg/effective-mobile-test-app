@@ -16,12 +16,12 @@ class BaseConfig(BaseSettings):
         extra="ignore",
     )
 
-    FASTAPI_DDD_TEMPLATE_ENV: Literal["dev", "test", "prod"]
-    FASTAPI_DDD_TEMPLATE_DEBUG: bool
+    EFFECTIVE_MOBILE_TEST_APP_ENV: Literal["dev", "test", "prod"]
+    EFFECTIVE_MOBILE_TEST_APP_DEBUG: bool
 
-    FASTAPI_DDD_TEMPLATE_JWT_ALGORITHM: str
-    FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME: int
-    FASTAPI_DDD_TEMPLATE_JWT_SECRET: SecretStr
+    EFFECTIVE_MOBILE_TEST_APP_JWT_ALGORITHM: str
+    EFFECTIVE_MOBILE_TEST_APP_JWT_TOKEN_EXPIRY_TIME: int
+    EFFECTIVE_MOBILE_TEST_APP_JWT_SECRET: SecretStr
 
     DB_PATH: str
     DB_HOST: str
@@ -31,17 +31,17 @@ class BaseConfig(BaseSettings):
     DB_USER_SECRET: SecretStr
     DB_TABLE_SCHEMA: str
 
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG: bool
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN: str
-    FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: SecretStr
+    EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_FLAG: bool
+    EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN: str
+    EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_PASSWORD_HASH: SecretStr
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME")
+    @field_validator("EFFECTIVE_MOBILE_TEST_APP_JWT_TOKEN_EXPIRY_TIME")
     @classmethod
     def _positive(cls, v: int) -> int:
         """Ensure token expiry is positive."""
         if v <= 0:
             raise ValueError(
-                "FASTAPI_DDD_TEMPLATE_JWT_TOKEN_EXPIRY_TIME must be positive"
+                "EFFECTIVE_MOBILE_TEST_APP_JWT_TOKEN_EXPIRY_TIME must be positive"
             )
         return v
 
@@ -67,12 +67,12 @@ class DevConfig(BaseConfig):
         extra="ignore",
     )
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_DEBUG")
+    @field_validator("EFFECTIVE_MOBILE_TEST_APP_DEBUG")
     @classmethod
     def _enforce_debug_true(cls, v: bool) -> bool:
-        """Ensure FASTAPI_DDD_TEMPLATE_DEBUG is True in development."""
+        """Ensure EFFECTIVE_MOBILE_TEST_APP_DEBUG is True in development."""
         if not v:
-            raise ValueError("FASTAPI_DDD_TEMPLATE_DEBUG must be True in development")
+            raise ValueError("EFFECTIVE_MOBILE_TEST_APP_DEBUG must be True in development")
         return v
 
 
@@ -85,12 +85,12 @@ class TestConfig(BaseConfig):
         extra="ignore",
     )
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_DEBUG")
+    @field_validator("EFFECTIVE_MOBILE_TEST_APP_DEBUG")
     @classmethod
     def _enforce_debug_false(cls, v: bool) -> bool:
-        """Ensure FASTAPI_DDD_TEMPLATE_DEBUG is False in testing."""
+        """Ensure EFFECTIVE_MOBILE_TEST_APP_DEBUG is False in testing."""
         if v:
-            raise ValueError("FASTAPI_DDD_TEMPLATE_DEBUG must be False in testing")
+            raise ValueError("EFFECTIVE_MOBILE_TEST_APP_DEBUG must be False in testing")
         return v
 
 
@@ -103,30 +103,30 @@ class ProdConfig(BaseConfig):
         extra="ignore",
     )
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_DEBUG")
+    @field_validator("EFFECTIVE_MOBILE_TEST_APP_DEBUG")
     @classmethod
     def _enforce_debug_false(cls, v: bool) -> bool:
         """Ensure DEBUG is False in production."""
         if v:
-            raise ValueError("FASTAPI_DDD_TEMPLATE_DEBUG must be False in production")
+            raise ValueError("EFFECTIVE_MOBILE_TEST_APP_DEBUG must be False in production")
         return v
 
-    @field_validator("FASTAPI_DDD_TEMPLATE_JWT_SECRET")
+    @field_validator("EFFECTIVE_MOBILE_TEST_APP_JWT_SECRET")
     @classmethod
     def _check_secret(cls, v: SecretStr) -> SecretStr:
         """Deny weak secrets in production."""
         if "secret" in v.get_secret_value():
-            raise ValueError("Invalid FASTAPI_DDD_TEMPLATE_JWT_SECRET in production")
+            raise ValueError("Invalid EFFECTIVE_MOBILE_TEST_APP_JWT_SECRET in production")
         return v
 
 
 # Cache config instance to avoid recreating settings on every import.
 @lru_cache
 def get_settings() -> BaseConfig:
-    """Return singleton config by FASTAPI_DDD_TEMPLATE_ENV."""
-    env = os.getenv("FASTAPI_DDD_TEMPLATE_ENV")
+    """Return singleton config by EFFECTIVE_MOBILE_TEST_APP_ENV."""
+    env = os.getenv("EFFECTIVE_MOBILE_TEST_APP_ENV")
     if not env:
-        raise ValueError("FASTAPI_DDD_TEMPLATE_ENV cannot be empty")
+        raise ValueError("EFFECTIVE_MOBILE_TEST_APP_ENV cannot be empty")
 
     match env.lower():
         case "dev":
@@ -136,4 +136,4 @@ def get_settings() -> BaseConfig:
         case "prod":
             return ProdConfig()  # type: ignore[call-arg]
         case _:
-            raise ValueError(f"Unknown FASTAPI_DDD_TEMPLATE_ENV value: {env.lower()}")
+            raise ValueError(f"Unknown EFFECTIVE_MOBILE_TEST_APP_ENV value: {env.lower()}")

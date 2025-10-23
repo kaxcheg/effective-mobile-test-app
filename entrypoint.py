@@ -62,9 +62,9 @@ def main() -> int:
     wait_for_db(host, 5432, 60)
     run_cmd(["alembic", "upgrade", "head"])
 
-    bootstrap_flag = os.getenv("FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG")
+    bootstrap_flag = os.getenv("EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_FLAG")
     if bootstrap_flag is None:
-        sys.exit("[entrypoint] FASTAPI_DDD_TEMPLATE_BOOTSTRAP_FLAG must be set")
+        sys.exit("[entrypoint] EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_FLAG must be set")
 
     if not bootstrap_flag:
         print("[entrypoint] Bootstrap flag is false. Proceeding without bootstrap.")

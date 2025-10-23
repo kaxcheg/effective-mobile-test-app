@@ -28,15 +28,15 @@ def uow_factory() -> UnitOfWork:
 async def main() -> int:
     """Bootstrap: create an admin user once"""
 
-    username = cfg.FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN
+    username = cfg.EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN
     password_hash = (
-        cfg.FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH.get_secret_value()
+        cfg.EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_PASSWORD_HASH.get_secret_value()
     )
 
     if not username or not password_hash:
         sys.exit(
-            "[fastapi_ddd_template_bootstrap] FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN, "
-            "FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH must be set"
+            "[effective_mobile_test_app_bootstrap] EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN, "
+            "EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_PASSWORD_HASH must be set"
         )
 
     try:
@@ -48,7 +48,7 @@ async def main() -> int:
         )
     except (DomainError, ValueError) as e:
         sys.exit(
-            f"[fastapi_ddd_template_bootstrap] User with provided parameters cannot be created: {e}"
+            f"[effective_mobile_test_app_bootstrap] User with provided parameters cannot be created: {e}"
         )
 
     try:
@@ -56,11 +56,11 @@ async def main() -> int:
             repo: UserRepository = uow.get_repo(UserRepository)
             await repo.add(user)
     except DuplicateUserError:
-        print("[fastapi_ddd_template_bootstrap] Username already exists")
+        print("[effective_mobile_test_app_bootstrap] Username already exists")
         sys.exit(0)
 
     print(
-        f"[fastapi_ddd_template_bootstrap] Admin created (id={user.id}, user={user.username})"
+        f"[effective_mobile_test_app_bootstrap] Admin created (id={user.id}, user={user.username})"
     )
     sys.exit(0)
 
