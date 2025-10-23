@@ -1,0 +1,219 @@
+name: CD deploy to CI runner
+
+on:
+  workflow_call:
+    inputs:
+      digest: {type: string, required: true}
+      repo_path: {type: string, required: true}
+      registry: {type: string, required: true}
+
+
+concurrency:
+  group: cd-ci-runner-${{ github.ref_name || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+env:
+  RELEASE: fastapi-ddd-template
+  NAMESPACE: ci-runner
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+jobs:
+  deploy-ci-runner:
+    runs-on: ubuntu-latest
+    environment: ci-runner
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Create KinD cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kind
+          
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ensure namespace exists
+        run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create/Update ECR imagePullSecret
+        run: |
+          kubectl -n "$NAMESPACE" create secret docker-registry ecr-pull \
+            --docker-server=${{ inputs.registry }} \
+            --docker-username=AWS \
+            --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create/Update fastapi-ddd-template-secrets
+        env:
+          DB_ADMIN_SECRET: ${{ secrets.DB_ADMIN_SECRET }}
+          DB_USER_SECRET: ${{ secrets.DB_USER_SECRET }}
+          FASTAPI_DDD_TEMPLATE_JWT_SECRET: ${{ secrets.FASTAPI_DDD_TEMPLATE_JWT_SECRET }}
+          FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: ${{ secrets.FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH }}
+        run: |
+          kubectl -n "$NAMESPACE" apply -f - <<YAML
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: fastapi-ddd-template-secrets
+            namespace: "$NAMESPACE"
+          type: Opaque
+          stringData:
+            DB_ADMIN_SECRET: "${DB_ADMIN_SECRET}"
+            DB_USER_SECRET: "${DB_USER_SECRET}"
+            FASTAPI_DDD_TEMPLATE_JWT_SECRET: "${FASTAPI_DDD_TEMPLATE_JWT_SECRET}"
+            FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH: "${FASTAPI_DDD_TEMPLATE_BOOTSTRAP_ADMIN_PASSWORD_HASH}"
+          YAML
+
+      - name: Derive API_VERSION
+        run: |
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [[ "$REF_NAME" == release/* ]]; then
+            echo "API_VERSION=${REF_NAME#release/}" >> "$GITHUB_ENV"
+          else
+            echo "API_VERSION=no_version"
+          fi
+          
+      - name: Helm upgrade
+        run: |
+          helm upgrade --install "$RELEASE" deploy/helm \
+            --namespace "$NAMESPACE" \
+            -f deploy/helm/values-ci-runner.yaml \
+            --set image.repository=${{ inputs.repo_path }} \
+            --set image.digest=${{ inputs.digest }} \
+            --set image.pullSecrets[0]=ecr-pull \
+            --set-string api.version="$API_VERSION" \
+            --set-file dbBootstrap.script=deploy/bootstrap/bootstrap_db.sh
+
+      - name: Wait rollout
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          echo "⏳ Waiting for DB Deployment..."
+          kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-db --timeout=180s
+          kubectl -n "$NAMESPACE" wait pod \
+            -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=db \
+            --for=condition=Ready --timeout=120s
+
+          echo "⏳ Waiting for DB bootstrap Job to complete..."
+          kubectl -n "$NAMESPACE" wait job/"$RELEASE"-db-bootstrap \
+            --for=condition=complete --timeout=300s
+
+          echo "⏳ Waiting for API Deployment..."
+          kubectl -n "$NAMESPACE" rollout status deploy/"$RELEASE"-api --timeout=180s
+          kubectl -n "$NAMESPACE" wait pod \
+            -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=api \
+            --for=condition=Ready --timeout=120s
+
+          echo "✅ Current resources for release $RELEASE:"
+          kubectl -n "$NAMESPACE" get deploy,sts,job,svc,pods \
+            -l app.kubernetes.io/instance="$RELEASE" -o wide
+
+        
+      - name: Integration tests
+        run: |
+          make test-int
+      
+      - name: Helm smoke test
+        run: helm -n "$NAMESPACE" test "$RELEASE" --filter smoke --timeout 90s --logs
+
+      - name: E2E tests
+        run: |
+          make test-e2e
+
+      - name: Get logs on failure (db ▸ db-bootstrap ▸ api)
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "::group::Summary of resources"
+          kubectl -n "$NAMESPACE" get deploy,sts,job,svc,pods -l app.kubernetes.io/instance="$RELEASE" -o wide || true
+          kubectl -n "$NAMESPACE" get events --sort-by=.metadata.creationTimestamp | tail -n 200 || true
+          echo "::endgroup::"
+
+          echo "::group::DB: describe & logs"
+          kubectl -n "$NAMESPACE" describe deploy/"$RELEASE"-db || true
+          kubectl -n "$NAMESPACE" describe statefulset/"$RELEASE"-db || true
+          kubectl -n "$NAMESPACE" describe svc/"$RELEASE"-db || true
+
+          for p in $(kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=db -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=500 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=500 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::DB-BOOTSTRAP: describe & logs"
+          kubectl -n "$NAMESPACE" describe job/"$RELEASE"-db-bootstrap || true
+          for p in $(kubectl -n "$NAMESPACE" get pods -l job-name="$RELEASE"-db-bootstrap -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::API: describe & logs"
+          kubectl -n "$NAMESPACE" describe deploy/"$RELEASE"-api || true
+          kubectl -n "$NAMESPACE" describe svc/"$RELEASE"-api || true
+
+          for p in $(kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE",app.kubernetes.io/component=api -o name); do
+            echo "--- logs $p (current) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+            echo "--- logs $p (previous) ---"
+            kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+            echo "--- describe $p events ---"
+            kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+          done
+          echo "::endgroup::"
+
+          echo "::group::SMOKE: describe & logs (helm.sh/hook-name=smoke)"
+
+          for p in $(kubectl -n "$NAMESPACE" get pods \
+              -l app.kubernetes.io/instance="$RELEASE" \
+              -o name); do
+
+            hook_name="$(kubectl -n "$NAMESPACE" get "$p" -o jsonpath='{.metadata.annotations.helm\.sh/hook-name}' 2>/dev/null || true)"
+            if [ "$hook_name" = "smoke" ]; then
+              echo "--- describe $p ---"
+              kubectl -n "$NAMESPACE" describe "$p" || true
+
+              echo "--- logs $p (current) ---"
+              kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 || true
+
+              echo "--- logs $p (previous) ---"
+              kubectl -n "$NAMESPACE" logs "$p" --all-containers --tail=1000 --previous || true
+
+              echo "--- events for $p ---"
+              kubectl -n "$NAMESPACE" describe "$p" | sed -n '/Events:/,$p' || true
+            fi
+          done
+
+          kubectl -n "$NAMESPACE" get pods -l app.kubernetes.io/instance="$RELEASE" -o wide | grep -E 'smoke' || true
+          echo "::endgroup::"
