@@ -12,7 +12,7 @@ async def test_successful_authentication(authenticate_use_case:AuthenticateUserU
     """Test successful user authentication."""
     test_user = initial_users[0]
     auth_request = AuthRequestDTO(
-        username=test_user.username,
+        email=test_user.email,
         raw_password=test_user.raw_password
     )
     presenter = FakeAuthenticationPresenter()
@@ -22,7 +22,7 @@ async def test_successful_authentication(authenticate_use_case:AuthenticateUserU
     assert presenter.state == State.OK
     assert isinstance(presenter.response, AuthResponseDTO)
     assert presenter.response.user_id == test_user.id
-    assert presenter.response.username == test_user.username
+    assert presenter.response.email == test_user.email
     assert presenter.response.role == test_user.role
 
 
@@ -31,7 +31,7 @@ async def test_authentication_with_wrong_password(authenticate_use_case:Authenti
     """Test authentication fails with wrong password."""
     test_user = initial_users[0]
     auth_request = AuthRequestDTO(
-        username=test_user.username,
+        email=test_user.email,
         raw_password=initial_users[0].raw_password+"x"
     )
     presenter = FakeAuthenticationPresenter()
@@ -44,10 +44,10 @@ async def test_authentication_with_wrong_password(authenticate_use_case:Authenti
 
 @pytest.mark.asyncio
 async def test_authentication_with_nonexistent_user(authenticate_use_case:AuthenticateUserUseCase):
-    """Test authentication fails with non-existent username."""
+    """Test authentication fails with non-existent user."""
 
     auth_request = AuthRequestDTO(
-        username="nonexistent_user",
+        email="nonexistent_user@email.com",
         raw_password="any_password"
     )
     presenter = FakeAuthenticationPresenter()
@@ -59,11 +59,11 @@ async def test_authentication_with_nonexistent_user(authenticate_use_case:Authen
 
 
 @pytest.mark.asyncio
-async def test_authentication_with_invalid_username_format(authenticate_use_case:AuthenticateUserUseCase):
-    """Test authentication fails with invalid username format."""
+async def test_authentication_with_invalid_email_format(authenticate_use_case:AuthenticateUserUseCase):
+    """Test authentication fails with invalid email format."""
 
     auth_request = AuthRequestDTO(
-        username="",
+        email="",
         raw_password="testpass123"
     )
     presenter = FakeAuthenticationPresenter()
@@ -80,7 +80,7 @@ async def test_authentication_with_invalid_password_format(authenticate_use_case
 
     test_user = initial_users[0]
     auth_request = AuthRequestDTO(
-        username=test_user.username,
+        email=test_user.email,
         raw_password=""
     )
     presenter = FakeAuthenticationPresenter()
@@ -92,11 +92,11 @@ async def test_authentication_with_invalid_password_format(authenticate_use_case
 
 
 @pytest.mark.asyncio
-async def test_authentication_with_wrong_username_and_password(authenticate_use_case:AuthenticateUserUseCase):
-    """Test authentication fails with both wrong username and password."""
+async def test_authentication_with_wrong_email_and_password(authenticate_use_case:AuthenticateUserUseCase):
+    """Test authentication fails with both wrong email and password."""
 
     auth_request = AuthRequestDTO(
-        username="wrong_user",
+        email="wrong_email@email.com",
         raw_password="wrong_password"
     )
     presenter = FakeAuthenticationPresenter()
@@ -108,12 +108,12 @@ async def test_authentication_with_wrong_username_and_password(authenticate_use_
 
 
 @pytest.mark.asyncio
-async def test_authentication_with_case_sensitive_username(authenticate_use_case:AuthenticateUserUseCase, initial_users:list[TestUser]):
-    """Test that username is case-sensitive."""
+async def test_authentication_with_case_sensitive_email(authenticate_use_case:AuthenticateUserUseCase, initial_users:list[TestUser]):
+    """Test that email is case-sensitive."""
 
     test_user = initial_users[0]
     auth_request = AuthRequestDTO(
-        username=test_user.username.upper(),
+        email=test_user.email.upper(),
         raw_password=test_user.raw_password
     )
     presenter = FakeAuthenticationPresenter()

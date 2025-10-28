@@ -25,5 +25,9 @@ def raise_for_presenter_400_state(p: Presenter) -> NoReturn:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=p.response
             )
+        case State.NOT_FOUND:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=p.response
+            )
 
     raise ValueError("Wrong presenter state")

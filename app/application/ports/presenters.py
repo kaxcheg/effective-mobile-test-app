@@ -14,6 +14,8 @@ class State(Enum):
     UNAUTHORIZED = auto()
     FORBIDDEN = auto()
     CONFLICT = auto()
+    NOT_FOUND = auto()
+    BAD_RESPONSE = auto()
 
 
 @runtime_checkable
@@ -49,6 +51,16 @@ class Presenter[D: DTO](Protocol):
     def unauthorized(self, message: str) -> None:
         """Set unauthorized state with message."""
         self._state = State.UNAUTHORIZED
+        self.response = message
+
+    def not_found(self, message: str) -> None:
+        """Set not found state with message."""
+        self._state = State.NOT_FOUND
+        self.response = message
+    
+    def bad_response(self, message: str) -> None:
+        """Set bas response state with message."""
+        self._state = State.BAD_RESPONSE
         self.response = message
 
 

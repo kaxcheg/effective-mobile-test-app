@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
+from uuid import UUID
 
 from app.application.dto.base import DTO
 
@@ -7,6 +8,7 @@ from app.application.dto.base import DTO
 @dataclass(slots=True, frozen=True)
 class CreateUserInputDTO(DTO):
     username: str
+    email: str
     password: str
     role: str
 
@@ -14,20 +16,42 @@ class CreateUserInputDTO(DTO):
 @dataclass(slots=True, frozen=True)
 class CreateUserOutputDTO(DTO):
     id: str
-    username: str
+    email: str
     role: str
 
+@dataclass(slots=True, frozen=True)
+class DeleteUserInputDTO(DTO):
+    id: str
+
+@dataclass(slots=True, frozen=True)
+class DeleteUserOutputDTO(DTO):
+    msg: str
+
+@dataclass(slots=True, frozen=True)
+class UpdateUserInputDTO(DTO):
+    id: str
+    username: str|None
+    email: str|None
+    password: str|None
+    role: str|None
+
+@dataclass(slots=True, frozen=True)
+class UpdateUserOutputDTO(DTO):
+    id: str
+    username: str
+    email: str
+    role: str
 
 @dataclass(slots=True, frozen=True)
 class AuthRequestDTO(DTO):
-    username: str
+    email: str
     raw_password: str
 
 
 @dataclass(slots=True, frozen=True)
 class AuthResponseDTO(DTO):
     user_id: str
-    username: str
+    email: str
     role: str
 
 
@@ -42,3 +66,8 @@ class CredentialDTO(DTO):
         "apikey",  # X-Api-Key
     ]
     value: str | dict | list
+
+@dataclass(slots=True, frozen=True)
+class UserSessionDTO(DTO):
+    "Session DTO"
+    id: UUID

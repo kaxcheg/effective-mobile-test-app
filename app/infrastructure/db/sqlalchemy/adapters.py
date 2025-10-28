@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Callable, ClassVar, TypeVar, override
 
-from sqlalchemy import select
+from sqlalchemy import select, update, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -11,19 +12,20 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
 )
 
-from app.application.dto import CredentialDTO
+from app.application.dto import CredentialDTO, UserSessionDTO
 from app.application.exceptions import (
-    DuplicateUserError,
+    IntegrityUserError,
     NotAuthenticatedError,
     NotAuthorizedError,
+    ConcurrencyError
 )
-from app.application.ports.services import AuthService
+from app.application.ports.services import AuthorizeService
 from app.application.ports.uow import UnitOfWork
 from app.domain.entities.base import Repository
 from app.domain.entities.user import User
 from app.domain.entities.user.repo import UserRepository
-from app.domain.services import IdGenerator
-from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
+from app.domain.services import UserIdGenerator
+from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole, Email
 from app.infrastructure.db.sqlalchemy.models.user import UserORM
 from app.infrastructure.security.jwt_service import (
     JwtTokenExpired,
@@ -50,22 +52,24 @@ class UserRepositorySQL(UserRepository):
         return User.from_storage(
             id=UserId(result.id),
             username=Username(result.username),
+            email=Email(result.email),
             password_hash=UserPasswordHash(result.password_hash),
             role=UserRole(result.role),
             is_active=result.is_active,
         )
 
     @override
-    async def get_by_username(self, username: Username) -> User | None:
-        """Return a user by username or None."""
+    async def get_by_email(self, email: Email) -> User | None:
+        """Return a user by email or None."""
         result = await self._s.scalars(
-            select(UserORM).where(UserORM.username == str(username))
+            select(UserORM).where(UserORM.email == str(email))
         )
         row = result.first()
         if row is None:
             return None
         return User.from_storage(
             id=UserId(row.id),
+            email=Email(row.email),
             username=Username(row.username),
             password_hash=UserPasswordHash(row.password_hash),
             role=UserRole(row.role),
@@ -78,6 +82,7 @@ class UserRepositorySQL(UserRepository):
         user_orm = UserORM(
             id=user.id.value,
             username=str(user.username),
+            email=str(user.email),
             password_hash=user.password_hash.value,
             role=str(user.role),
             is_active=user.is_active,
@@ -86,7 +91,31 @@ class UserRepositorySQL(UserRepository):
             self._s.add(user_orm)
             await self._s.flush()
         except IntegrityError as e:
-            raise DuplicateUserError(f"User {user.username} already exists") from e
+            raise IntegrityUserError(f"Integrity error occured when adding {user_orm.id}") from e
+
+    @override
+    async def save(self, user: User) -> User:
+        stmt = update(UserORM).where(UserORM.id==user.id.value).values(
+            email=user.email.value,
+            username=user.username.value,
+            role=user.role,
+            is_active=user.is_active,
+            password_hash=user.password_hash.value
+        ).returning(UserORM)
+        try:
+            res = await self._s.execute(stmt)
+            rows = res.scalars().all()
+        except IntegrityError as e:
+            raise IntegrityUserError(f"Integrity error occured when adding {user.id.value}") from e
+        if len(rows) != 1:
+            raise ConcurrencyError("User was modified concurrently")
+        return User.from_storage(
+            id=UserId(rows[0].id),
+            username=Username(rows[0].username),
+            email=Email(rows[0].email),
+            password_hash=UserPasswordHash(rows[0].password_hash),
+            role=UserRole(rows[0].role)
+        )
 
 
 R = TypeVar("R", bound=Repository)
@@ -153,7 +182,7 @@ class UoWSQL(UnitOfWork):
         return cast(R, repo)
 
 
-class UUIDv4Generator(IdGenerator):
+class UUIDv4Generator(UserIdGenerator):
     """Id generator that produces UUIDv4 values."""
 
     @override
@@ -162,45 +191,15 @@ class UUIDv4Generator(IdGenerator):
         return UserId(uuid.uuid4())
 
 
-class TokenSQLAuthService(AuthService[UserRepository]):
+class RoleAuthService(AuthorizeService):
     """Auth facade using JWT and SQL repository."""
 
-    @override
-    def __init__(
-        self, credentials: CredentialDTO, token_service: JwtTokenService
-    ) -> None:
-        """Store credentials and token service."""
-
-        super().__init__(credentials)
-        self._token_service = token_service
-
-    @override
-    async def current_user(self, repo: UserRepository) -> User:
-        """Return current user derived from credentials or raise."""
-        try:
-            assert isinstance(self._credentials.value, str)
-            payload = self._token_service.decode(self._credentials.value)
-        except (JwtTokenInvalid, JwtTokenExpired, AssertionError):
-            raise NotAuthenticatedError("Unauthorized")
-
-        user_id = payload.get("sub")
-        role = payload.get("role")
-
-        if not isinstance(user_id, str) or not isinstance(role, str):
-            raise NotAuthenticatedError("Unauthorized")
-
-        user = await repo.get_by_id(UserId.from_str(user_id))
-        if user is None:
-            raise NotAuthenticatedError("Unauthorized")
-
-        return user
 
     @override
     def ensure_role(
-        self, user_id: UserId, user_role: UserRole, required_role: UserRole
+        self, user_id: UserId, user_role: UserRole, required_roles: list[UserRole]
     ) -> None:
         """Raise when role is insufficient."""
-        # Allow ADMIN and the exact target role.
-        if user_role in {UserRole.ADMIN, required_role}:
+        if user_role in required_roles:
             return
         raise NotAuthorizedError("Forbidden")

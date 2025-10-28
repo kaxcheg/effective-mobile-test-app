@@ -12,6 +12,8 @@ from app.domain.value_objects.constants import (
     HASH_LEN,
     USERNAME_MAX_LEN,
     USERNAME_MIN_LEN,
+    EMAIL_MIN_LEN,
+    EMAIL_MAX_LEN
 )
 from app.infrastructure.db.sqlalchemy.models.base import Base
 
@@ -26,9 +28,8 @@ class UserORM(Base):
         default=uuid.uuid4,
         nullable=False,
     )
-    username: Mapped[str] = mapped_column(
-        String(USERNAME_MAX_LEN), unique=True, nullable=False
-    )
+    username: Mapped[str] = mapped_column(String(USERNAME_MAX_LEN), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(EMAIL_MAX_LEN), unique=True, nullable=False)
     password_hash: Mapped[bytes] = mapped_column(LargeBinary(HASH_LEN), nullable=False)
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -47,5 +48,9 @@ class UserORM(Base):
         UniqueConstraint("username", name="uq_user_username"),
         CheckConstraint(
             f"length(username) >= {USERNAME_MIN_LEN}", name="username_min_length"
+        ),
+        UniqueConstraint("email", name="uq_user_email"),
+        CheckConstraint(
+            f"length(email) >= {EMAIL_MIN_LEN}", name="email_min_length"
         ),
     )

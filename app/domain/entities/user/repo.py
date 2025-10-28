@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from app.domain.entities.base import Repository
 from app.domain.entities.user import User
-from app.domain.value_objects import UserId, Username
+from app.domain.value_objects import UserId, Email
 
 
 class UserRepository(Repository):
     """Repository contract for user entities."""
 
-    async def get_by_username(self, username: Username) -> User | None:
-        """Return user by username.
+    async def get_by_email(self, email: Email) -> User | None:
+        """Return user by email.
 
         Args:
-            username: Unique username.
+            email: Unique email.
 
         Returns:
             User | None: Found user or None.
@@ -32,6 +32,14 @@ class UserRepository(Repository):
 
     async def add(self, user: User) -> None:
         """Persist user.
+
+        Args:
+            user: User domain entity.
+        """
+        ...
+    
+    async def save(self, user: User) -> User:
+        """Save user.
 
         Args:
             user: User domain entity.

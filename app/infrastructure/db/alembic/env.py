@@ -8,9 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
 
 from app.config import get_settings
 from app.infrastructure.db.sqlalchemy.models.base import Base  # metadata scan
-from app.infrastructure.db.sqlalchemy.models.user import (  # noqa: F401  # ensure model import
-    UserORM,
-)
+from app.infrastructure.db.sqlalchemy.models.user import UserORM  # noqa: F401  # ensure model import
+from app.infrastructure.db.sqlalchemy.models.user_session import UserSessionORM
 
 settings = get_settings()
 config = context.config

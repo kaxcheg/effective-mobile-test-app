@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 from app.domain.entities.base import Entity
 from app.domain.exceptions.base import DomainError
-from app.domain.services import IdGenerator
-from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole
+from app.domain.services import UserIdGenerator
+from app.domain.value_objects import UserId, Username, UserPasswordHash, UserRole, Email
 
 
 @dataclass(eq=False, kw_only=True)
@@ -17,10 +17,12 @@ class User(Entity[UserId]):
         username: Unique username.
         password_hash: Secure password hash.
         role: Current role.
+        email: Email
         is_active: Activity flag.
     """
 
     username: Username
+    email: Email
     password_hash: UserPasswordHash
     role: UserRole
     is_active: bool = True
@@ -32,9 +34,10 @@ class User(Entity[UserId]):
         cls,
         *,
         username: Username,
+        email: Email,
         password_hash: UserPasswordHash,
         role: UserRole,
-        id_gen: IdGenerator,
+        id_gen: UserIdGenerator,
     ) -> User:
         """Create a new user with generated id.
 
@@ -49,6 +52,7 @@ class User(Entity[UserId]):
         """
         return cls(
             id=id_gen.new(),
+            email=email,
             username=username,
             password_hash=password_hash,
             role=role,
@@ -60,6 +64,7 @@ class User(Entity[UserId]):
         *,
         id: UserId,
         username: Username,
+        email: Email,
         password_hash: UserPasswordHash,
         role: UserRole,
         is_active: bool = True,
@@ -79,6 +84,7 @@ class User(Entity[UserId]):
         return cls(
             id=id,
             username=username,
+            email=email,
             password_hash=password_hash,
             role=role,
             is_active=is_active,
@@ -97,6 +103,16 @@ class User(Entity[UserId]):
         if new == self.username:
             raise DomainError("New username is identical to current.")
         self.username = new  # type: ignore[misc]
+
+    def change_email(self, new: Email) -> None:
+        """Set new email or raise if identical.
+
+        Raises:
+            DomainError: When email is unchanged.
+        """
+        if new == self.email:
+            raise DomainError("New email is identical to current.")
+        self.email = new  # type: ignore[misc]
 
     def change_password(self, new_hash: UserPasswordHash) -> None:
         """Set new password hash or raise if identical.

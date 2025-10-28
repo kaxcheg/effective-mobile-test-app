@@ -4,6 +4,11 @@ from app.application.dto.dto import (
     CreateUserInputDTO,
     CreateUserOutputDTO,
     CredentialDTO,
+    UserSessionDTO,
+    DeleteUserInputDTO,
+    DeleteUserOutputDTO,
+    UpdateUserInputDTO,
+    UpdateUserOutputDTO
 )
 
 __all__ = [
@@ -12,4 +17,9 @@ __all__ = [
     "CreateUserInputDTO",
     "CreateUserOutputDTO",
     "CredentialDTO",
+    "UserSessionDTO",
+    "DeleteUserInputDTO",
+    "DeleteUserOutputDTO",
+    "UpdateUserInputDTO",
+    "UpdateUserOutputDTO"
 ]

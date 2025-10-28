@@ -6,13 +6,13 @@ import sys
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.application.exceptions import DuplicateUserError
+from app.application.exceptions import IntegrityUserError
 from app.application.ports.uow import UnitOfWork
 from app.config import get_settings
 from app.domain.entities.user import User
 from app.domain.entities.user.repo import UserRepository
 from app.domain.exceptions.base import DomainError
-from app.domain.value_objects import Username, UserPasswordHash, UserRole
+from app.domain.value_objects import Username, UserPasswordHash, UserRole, Email
 from app.infrastructure.db.sqlalchemy.adapters import UoWSQL, UUIDv4Generator
 
 cfg = get_settings()
@@ -28,20 +28,23 @@ def uow_factory() -> UnitOfWork:
 async def main() -> int:
     """Bootstrap: create an admin user once"""
 
-    username = cfg.EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN
+    username = cfg.EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_USERNAME
     password_hash = (
         cfg.EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_PASSWORD_HASH.get_secret_value()
     )
+    email = cfg.EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_EMAIL
 
-    if not username or not password_hash:
+    if not username or not password_hash or not email:
         sys.exit(
-            "[effective_mobile_test_app_bootstrap] EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN, "
-            "EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_PASSWORD_HASH must be set"
+            "[effective_mobile_test_app_bootstrap] EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_USERNAME, "
+            "EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_EMAIL,"
+            "EFFECTIVE_MOBILE_TEST_APP_BOOTSTRAP_ADMIN_PASSWORD_HASH, must be set"
         )
 
     try:
         user = User.create(
             username=Username(username),
+            email=Email(email),
             password_hash=UserPasswordHash(value=password_hash.encode()),
             role=UserRole.ADMIN,
             id_gen=UUIDv4Generator(),
@@ -55,8 +58,8 @@ async def main() -> int:
         async with uow_factory() as uow:
             repo: UserRepository = uow.get_repo(UserRepository)
             await repo.add(user)
-    except DuplicateUserError:
-        print("[effective_mobile_test_app_bootstrap] Username already exists")
+    except IntegrityUserError:
+        print("[effective_mobile_test_app_bootstrap] User already exists")
         sys.exit(0)
 
     print(

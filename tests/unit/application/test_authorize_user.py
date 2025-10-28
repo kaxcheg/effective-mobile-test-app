@@ -2,58 +2,70 @@ import pytest
 
 from app.domain.value_objects import UserRole
 
-from app.application.dto.base import DTO
+from app.application.dto import CreateUserInputDTO, CreateUserOutputDTO
 from app.application.ports.presenters import AuthPresenter, State
-from app.application.use_cases import AuthorizeUserUseCase
+from app.application.use_cases import CreateUserUseCase
 
-from tests.adapters import FakeAuthService, FakeAuthorizationPresenter
+from tests.adapters import FakeAuthService, FakeCreateUserPresenter
 
-
-class TestAuthorizeUseCase(AuthorizeUserUseCase[DTO, DTO]):
-    async def run(self, dto: DTO, presenter: AuthPresenter[DTO]) -> None:
-        presenter.ok(dto)
 
 @pytest.mark.asyncio
-async def test_authorize_success(uow_factory, successful_auth_service):
+async def test_authorize_success(
+    current_user, 
+    successful_auth_service,
+    uow_factory,
+    password_hasher,
+    id_generator):
     """Test authentication fails with wrong password."""
     
-    uc = TestAuthorizeUseCase(uow_factory, successful_auth_service, UserRole.ADMIN)
+    uc = CreateUserUseCase(
+        successful_auth_service, 
+        current_user,
+        uow_factory,
+        password_hasher,
+        id_generator
+    )
 
-    presenter = FakeAuthorizationPresenter()
-    dto = DTO()
+    presenter = FakeCreateUserPresenter()
+    dto = CreateUserInputDTO(
+        username="",
+        email="test@email.com",
+        password="password123",
+        role=UserRole.USER
+    )
     await uc.execute(dto, presenter)
     
-    assert presenter.state == State.OK
-    assert presenter.response == dto 
+    assert presenter.state is not State.FORBIDDEN
+
 
 @pytest.mark.asyncio
-async def test_authorize_user_not_authenticated(uow_factory):
-    """Test authorization fails when user is not authenticated."""
-    auth_service = FakeAuthService(
-        is_role_ensured=True,
-        is_user_found=False,
-    )
-    uc = TestAuthorizeUseCase(uow_factory, auth_service, UserRole.USER)
-    presenter = FakeAuthorizationPresenter()
-    
-    await uc.execute(DTO(), presenter)
-    
-    assert presenter.state == State.UNAUTHORIZED
-    assert presenter.response == "Not authorized"
-
-@pytest.mark.asyncio
-async def test_authorize_insufficient_role(uow_factory):
+async def test_authorize_insufficient_role(
+    current_user, 
+    uow_factory,
+    password_hasher,
+    id_generator):
     """Test authorization fails when user has insufficient role."""
     
     auth_service = FakeAuthService(
         is_role_ensured=False,
-        is_user_found=True,
     )
     
-    uc = TestAuthorizeUseCase(uow_factory, auth_service, UserRole.ADMIN)
-    presenter = FakeAuthorizationPresenter()
+    uc = CreateUserUseCase(
+            auth_service, 
+            current_user,
+            uow_factory,
+            password_hasher,
+            id_generator
+        )    
+    presenter = FakeCreateUserPresenter()
+    dto = CreateUserInputDTO(
+        username="",
+        email="test@email.com",
+        password="password123",
+        role=UserRole.USER
+    )
     
-    await uc.execute(DTO(), presenter)
+    await uc.execute(dto, presenter)
     
     assert presenter.state == State.FORBIDDEN
     assert presenter.response == "Forbidden"

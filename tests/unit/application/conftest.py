@@ -1,6 +1,7 @@
 import pytest
 
-from app.domain.value_objects import UserId, UserRole
+from app.domain.entities.user import User
+from app.domain.value_objects import UserId, UserRole, Username, Email, UserPasswordHash
 from app.domain.value_objects.constants import HASH_LEN
 
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
@@ -18,6 +19,16 @@ from tests.adapters import (
     FakeIdGenerator
 )
 
+@pytest.fixture
+def current_user():
+    return User(
+        id=UserId.new(),
+        username=Username("current_username"),
+        email=Email("current@email.com"),
+        password_hash=UserPasswordHash(('b'*HASH_LEN).encode()),
+        role=UserRole.ADMIN
+
+    )
 
 @pytest.fixture
 def initial_users():
@@ -26,6 +37,7 @@ def initial_users():
         TestUser(
             id=str(UserId.new()),
             username="testuser",
+            email="testuser@email.com",
             raw_password="testpass123",
             password_hash="a" * HASH_LEN,
             role=UserRole.USER
@@ -33,6 +45,7 @@ def initial_users():
         TestUser(
             id=str(UserId.new()),
             username="admin",
+            email="admin@email.com",
             raw_password="adminpass456",
             password_hash="b" * HASH_LEN,
             role=UserRole.ADMIN
@@ -72,4 +85,4 @@ def id_generator():
 
 @pytest.fixture
 def successful_auth_service():
-    return FakeAuthService(is_user_found=True, is_role_ensured=True)
+    return FakeAuthService(is_role_ensured=True)

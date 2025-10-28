@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import traceback
 import os
 import sys
 from logging.handlers import RotatingFileHandler
@@ -40,14 +41,14 @@ class JsonFormatter(logging.Formatter):
             data["message"] = str(raw_msg)
 
         if record.exc_info:
-            data["trace"] = super().formatException(record.exc_info)
+            etype, evalue, tb = record.exc_info
+            data["error"] = {
+                "type": etype.__name__ if etype else None,
+                "message": "" if evalue is None else str(evalue),
+            }
+            data["trace"] = traceback.format_exception(etype, evalue, tb)
 
-        return (
-            json.dumps(data, ensure_ascii=False)
-            .replace('\\"', '"')
-            .replace("\\\\", "\\")
-        )
-
+        return json.dumps(data, ensure_ascii=False, indent=2)
 
 class LevelFilter(logging.Filter):
     def __init__(self, min_level: int | None = None, max_level: int | None = None):

@@ -1,3 +1,3 @@
-from app.domain.services.services import IdGenerator
+from app.domain.services.services import UserIdGenerator
 
-__all__ = ["IdGenerator"]
+__all__ = ["UserIdGenerator"]

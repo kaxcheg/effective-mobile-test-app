@@ -1,16 +1,17 @@
 import pytest
 
 from app.domain.entities.user.repo import UserRepository
-from app.domain.value_objects import UserRole, Username
+from app.domain.value_objects import UserRole, Email
 
 from app.application.dto import CreateUserInputDTO, CreateUserOutputDTO
 from app.application.ports import UnitOfWork, State
 from app.application.use_cases import CreateUserUseCase
 
-from tests.adapters import FakeCreateUserPresenter
+from tests.adapters import FakeCreateUserPresenter, TestUser
 
 @pytest.mark.asyncio
 async def test_create_user_success(
+    current_user,
     successful_auth_service,
     uow_factory,
     password_hasher,
@@ -20,6 +21,7 @@ async def test_create_user_success(
 
     use_case = CreateUserUseCase(
         auth_service=successful_auth_service,
+        user=current_user,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -27,6 +29,7 @@ async def test_create_user_success(
     
     dto = CreateUserInputDTO(
         username="new_user",
+        email="new@email.com",
         password="secure_password123",
         role=UserRole.USER
     )
@@ -36,29 +39,31 @@ async def test_create_user_success(
     
     assert presenter.state is State.OK
     assert isinstance(presenter.response, CreateUserOutputDTO)
-    assert presenter.response.username == dto.username
+    assert presenter.response.email == dto.email
     assert presenter.response.role == dto.role
     
     async with uow_factory() as uow:
         uow: UnitOfWork
         repo = uow.get_repo(UserRepository)
-        new_user = repo.get_by_username(Username(dto.username))
+        new_user = repo.get_by_email(Email(dto.email))
     
     assert new_user is not None
 
 
 @pytest.mark.asyncio
 async def test_create_user_conflict(
+    current_user,
     successful_auth_service,
     uow_factory,
     password_hasher,
     id_generator,
-    initial_users
+    initial_users: list[TestUser]
 ):
     """Test user creation fails when username already exists."""
 
     use_case = CreateUserUseCase(
         auth_service=successful_auth_service,
+        user=current_user,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -67,6 +72,7 @@ async def test_create_user_conflict(
     existing_user = initial_users[0]
     dto = CreateUserInputDTO(
         username=existing_user.username,
+        email=existing_user.email,
         password="password123",
         role=UserRole.USER
     )
@@ -75,12 +81,13 @@ async def test_create_user_conflict(
     await use_case.execute(dto, presenter)
     
     assert presenter.state == State.CONFLICT
-    assert presenter.response == "Username already exists"
+    assert presenter.response == "User with given unique atributes already exists"
 
 
 @pytest.mark.asyncio
 async def test_create_user_validation_error(
     successful_auth_service,
+    current_user,
     uow_factory,
     password_hasher,
     id_generator
@@ -89,6 +96,7 @@ async def test_create_user_validation_error(
 
     use_case = CreateUserUseCase(
         auth_service=successful_auth_service,
+        user=current_user,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -96,6 +104,7 @@ async def test_create_user_validation_error(
     
     dto = CreateUserInputDTO(
         username="",
+        email="test@email.com",
         password="password123",
         role=UserRole.USER
     )
@@ -111,6 +120,7 @@ async def test_create_user_validation_error(
 @pytest.mark.asyncio
 async def test_create_user_invalid_role(
     successful_auth_service,
+    current_user,
     uow_factory,
     password_hasher,
     id_generator
@@ -119,6 +129,7 @@ async def test_create_user_invalid_role(
 
     use_case = CreateUserUseCase(
         auth_service=successful_auth_service,
+        user=current_user,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -126,6 +137,7 @@ async def test_create_user_invalid_role(
     
     dto = CreateUserInputDTO(
         username="new_user",
+        email="test@email.com",
         password="password123",
         role="INVALID_ROLE"
     )
@@ -141,6 +153,7 @@ async def test_create_user_invalid_role(
 @pytest.mark.asyncio
 async def test_create_user_empty_password(
     successful_auth_service,
+    current_user,
     uow_factory,
     password_hasher,
     id_generator
@@ -149,6 +162,7 @@ async def test_create_user_empty_password(
 
     use_case = CreateUserUseCase(
         auth_service=successful_auth_service,
+        user=current_user,
         uow_factory=uow_factory,
         hasher=password_hasher,
         id_gen=id_generator
@@ -156,6 +170,7 @@ async def test_create_user_empty_password(
     
     dto = CreateUserInputDTO(
         username="new_user",
+        email="test@email.com",
         password="",
         role=UserRole.USER
     )

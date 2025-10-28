@@ -3,21 +3,22 @@ from dataclasses import dataclass, asdict
 
 from app.domain.entities.user import User
 from app.domain.entities.user.repo import Repository, UserRepository
-from app.domain.value_objects import UserId, UserPasswordHash, UserRawPassword, UserRole, Username
+from app.domain.value_objects import UserId, UserPasswordHash, UserRawPassword, UserRole, Username, Email
 
 from app.domain.value_objects.constants import HASH_LEN
 from app.application.dto.base import DTO
 from app.application.dto import AuthResponseDTO, CreateUserOutputDTO, CredentialDTO
 from app.application.ports.presenters import Presenter, AuthPresenter
 from app.application.ports.uow import UnitOfWork
-from app.application.ports import AuthService, PasswordVerifier, PasswordHasher, IdGenerator
-from app.application.exceptions import DuplicateUserError, NotAuthenticatedError, NotAuthorizedError
+from app.application.ports import AuthorizeService, PasswordVerifier, PasswordHasher, UserIdGenerator
+from app.application.exceptions import IntegrityUserError, NotAuthenticatedError, NotAuthorizedError
 
 @dataclass
 class TestUser:
     """Test user data structure."""
     id: str
     username: str
+    email: str
     raw_password: str
     password_hash: str
     role: str
@@ -53,32 +54,33 @@ class InMemoryUserRepository(UserRepository):
     
     def __init__(self, initial_users:list[TestUser]) -> None:
         self.users_by_id:dict[UserId,User] = {}
-        self.users_by_username:dict[Username,User] = {}
+        self.users_by_email:dict[Email,User] = {}
 
         for user in initial_users:
             user_instance = User.from_storage(
                 id=UserId.from_str(user.id),
+                email=Email(user.email),
                 username=Username(user.username),
                 password_hash=UserPasswordHash(user.password_hash.encode()),
                 role=UserRole(user.role)
             )
             self.users_by_id[UserId.from_str(user.id)] = user_instance
-            self.users_by_username[Username(user.username)] = user_instance
+            self.users_by_email[Email(user.email)] = user_instance
     
     async def get_by_id(self, user_id: UserId) -> User | None:
         """Get user by ID."""
         return self.users_by_id.get(user_id)
     
-    async def get_by_username(self, username: Username) -> User | None:
-        """Get user by username."""
-        return self.users_by_username.get(username)
+    async def get_by_email(self, email: Email) -> User | None:
+        """Get user by email."""
+        return self.users_by_email.get(email)
 
     async def add(self, user: User) -> None:
         """Save or update user."""
-        if user.id in self.users_by_id or user.username in self.users_by_username:
-            raise DuplicateUserError
+        if user.id in self.users_by_id or user.email in self.users_by_email:
+            raise IntegrityUserError
         self.users_by_id[user.id] = user
-        self.users_by_username[user.username] = user
+        self.users_by_email[user.email] = user
         
         
 R = TypeVar("R", bound=Repository)
@@ -118,31 +120,17 @@ class FakeUoW(UnitOfWork):
         return cast(R, repo)
 
 
-class FakeAuthService(AuthService[UserRepository]):
+class FakeAuthService(AuthorizeService):
     """Test authentication service implementation."""
     
-    def __init__(self, is_role_ensured: bool, is_user_found: bool):
+    def __init__(self, is_role_ensured: bool):
         self.is_role_ensured = is_role_ensured
-        self.is_user_found = is_user_found
+        # self.is_user_found = is_user_found
         
-    def ensure_role(self, user_id: UserId, user_role: UserRole, required_role: UserRole) -> None:
+    def ensure_role(self, user_id: UserId, user_role: UserRole, required_roles: list[UserRole]) -> None:
         """Check if user has required role."""
         if not self.is_role_ensured:
-            raise NotAuthorizedError(f"User role {user_role} does not match target role {required_role}")
-    
-    async def current_user(self, repo: UserRepository) -> User:
-        """Get current authenticated user."""
-        if not self.is_user_found:
-            raise NotAuthenticatedError("No authenticated user")
-        
-        user_stub = User.from_storage(
-                id=UserId.new(),
-                username=Username("stub_user"),
-                password_hash=UserPasswordHash(("x"*HASH_LEN).encode()),
-                role=UserRole(UserRole.USER)
-            )
-
-        return user_stub
+            raise NotAuthorizedError(f"User role {user_role} does not match target roles {required_roles}")
 
 class FakePasswordHasher(PasswordHasher):
     """Test password hasher implementation."""
@@ -157,7 +145,7 @@ class FakePasswordHasher(PasswordHasher):
         fake_hash = fake_hash.ljust(HASH_LEN, 'x')
         return UserPasswordHash(fake_hash.encode())
     
-class FakeIdGenerator(IdGenerator):
+class FakeIdGenerator(UserIdGenerator):
     """Test ID generator implementation."""
     
     def new(self) -> UserId:

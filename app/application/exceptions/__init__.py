@@ -1,7 +1,17 @@
 from app.application.exceptions.exceptions import (
-    DuplicateUserError,
+    IntegrityUserError,
     NotAuthenticatedError,
     NotAuthorizedError,
+    DuplicateUserSessionError, 
+    NotFoundUserSessionError,
+    ConcurrencyError
 )
 
-__all__ = ["DuplicateUserError", "NotAuthenticatedError", "NotAuthorizedError"]
+__all__ = [
+    "IntegrityUserError", 
+    "NotAuthenticatedError", 
+    "NotAuthorizedError", 
+    "DuplicateUserSessionError", 
+    "NotFoundUserSessionError",
+    "ConcurrencyError"
+    ]

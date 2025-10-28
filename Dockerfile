@@ -22,7 +22,3 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY ./app ./app
 COPY ./entrypoint.py ./entrypoint.py
 COPY ./alembic.ini ./alembic.ini
-
-# rm -rf /var/lib/apt/lists/* cleans apt cache to reduce image size
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl && rm -rf /var/lib/apt/lists/*

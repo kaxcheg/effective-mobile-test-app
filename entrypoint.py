@@ -27,6 +27,7 @@ def wait_for_db(host: str, port: int, timeout: int = 30) -> None:
 
 def run_cmd(cmd: list[str]) -> None:
     """Run subprocess and exit on failure."""
+    print(f"Running command: {cmd}")
     res = subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
     if res.returncode:
         sys.exit(f"[entrypoint] command failed: {' '.join(cmd)}")

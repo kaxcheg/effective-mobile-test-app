@@ -10,11 +10,11 @@ from app.application.use_cases.base import UseCase
 from app.config.logging import get_logger
 from app.domain.entities.user.repo import UserRepository
 from app.domain.exceptions import ValueObjectError
-from app.domain.value_objects import Username, UserRawPassword
+from app.domain.value_objects import Email, UserRawPassword
 
 
 class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
-    """Authenticate user by username and password."""
+    """Authenticate user by email and password."""
 
     logger = get_logger(__name__)
 
@@ -37,11 +37,11 @@ class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
         try:
             async with self._uow_factory() as uow:
                 repo: UserRepository = uow.get_repo(UserRepository)
-                user = await repo.get_by_username(Username(dto.username))
+                user = await repo.get_by_email(Email(dto.email))
         except ValueObjectError:
             presenter.unauthorized("Invalid credentials")
             self.logger.warning(
-                {"event": "auth_failed", "reason": "bad_username_format"}
+                {"event": "auth_failed", "reason": "bad_email_format"}
             )
             return
 
@@ -69,7 +69,7 @@ class AuthenticateUserUseCase(UseCase[AuthRequestDTO, AuthResponseDTO]):
         presenter.ok(
             AuthResponseDTO(
                 user_id=str(user.id),
-                username=str(user.username),
+                email=str(user.email),
                 role=str(user.role),
             )
         )

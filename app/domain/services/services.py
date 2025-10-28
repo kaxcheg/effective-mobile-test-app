@@ -5,7 +5,7 @@ from typing import Protocol
 from app.domain.value_objects import UserId
 
 
-class IdGenerator(Protocol):
+class UserIdGenerator(Protocol):
     """Strategy interface for generating unique UserId values."""
 
     def new(self) -> UserId: ...
